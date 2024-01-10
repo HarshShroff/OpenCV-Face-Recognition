@@ -1,0 +1,87 @@
+"""
+======================================================================================
+                            for RealSense Camera
+======================================================================================
+"""
+
+import cv2
+import dlib
+import numpy as np
+from imutils import face_utils
+import os 
+import pyrealsense2 as rs
+
+recognizer = cv2.face.LBPHFaceRecognizer_create()
+recognizer.read('trainer/trainer.yml')
+
+# Load the shape predictor for dlib face landmarks
+shape_predictor_path = "shape_predictor_68_face_landmarks.dat"
+detector = dlib.get_frontal_face_detector()
+predictor = dlib.shape_predictor(shape_predictor_path)
+
+font = cv2.FONT_HERSHEY_SIMPLEX
+
+# initiate id counter
+id = 0
+
+# names related to ids: example ==> Marcelo: id=1, etc
+names = ['None', 'Harsh'] 
+
+# Initialize and start RealSense video capture
+pipeline = rs.pipeline()
+config = rs.config()
+config.enable_stream(rs.stream_color, 640, 480, rs.format_BGR8, 30)
+
+pipeline.start(config)
+
+try:
+    while True:
+        # Wait for a coherent pair of frames: color and depth
+        frames = pipeline.wait_for_frames()
+        color_frame = frames.get_color_frame()
+        if not color_frame:
+            continue
+
+        # Convert RealSense frame to OpenCV format
+        frame = np.asanyarray(color_frame.get_data())
+        gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+        
+        # Detect faces using dlib
+        faces = detector(gray)
+
+        for face in faces:
+            # Get the facial landmarks
+            shape = predictor(gray, face)
+            shape = face_utils.shape_to_np(shape)
+
+            # Draw rectangle around the face
+            (x, y, w, h) = face_utils.rect_to_bb(face)
+            cv2.rectangle(frame, (x, y), (x+w, y+h), (0, 255, 0), 2)
+
+            # Predict the face ID
+            id, confidence = recognizer.predict(gray[y:y+h, x:x+w])
+
+            # Check if confidence is less than 100 ==> "0" is a perfect match 
+            if confidence < 100:
+                id = names[id]
+                confidence = " {0}%".format((round(100 - confidence)))
+            else:
+                id = "unknown"
+                confidence = " {0}%".format((round(100 - confidence)))
+
+            # Display the ID and confidence
+            cv2.putText(frame, str(id), (x+5, y-5), font, 1, (255, 255, 255), 2)
+            cv2.putText(frame, str(confidence), (x+5, y+h-5), font, 1, (255, 255, 0), 1)
+
+        # Display the resulting frame
+        cv2.imshow('Real-Time Face Recognition', frame)
+
+        # Press 'ESC' to exit the video stream
+        k = cv2.waitKey(10) & 0xFF
+        if k == 27:
+            break
+
+finally:
+    # Stop streaming
+    pipeline.stop()
+    cv2.destroyAllWindows()

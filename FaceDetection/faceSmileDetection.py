@@ -11,7 +11,7 @@ import cv2
 faceCascade = cv2.CascadeClassifier('Cascades/haarcascade_frontalface_default.xml')
 smileCascade = cv2.CascadeClassifier('Cascades/haarcascade_smile.xml')
  
-cap = cv2.VideoCapture(0)
+cap = cv2.VideoCapture(1)
 cap.set(3,640) # set Width
 cap.set(4,480) # set Height
 
